@@ -406,6 +406,27 @@ button, input, select, textarea {
   font-weight: 500;
 }
 
+.pos-qty-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.pos-qty-btn {
+  flex: 1;
+  padding: 0.35rem 0.2rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  transition: transform 0.1s ease, background-color 0.15s ease, border-color 0.15s ease;
+  min-width: 0;
+}
+
+.pos-qty-btn:active {
+  transform: scale(0.94);
+}
+
 /* Hero Banner (Customer View) */
 .hero-banner {
   position: relative;
@@ -1732,9 +1753,11 @@ button, input, select, textarea {
     font-size: 0.62rem !important;
   }
 
-  .pos-dish-card .btn-sm {
-    padding: 0.2rem 0.35rem !important;
+  .pos-dish-card .btn-sm,
+  .pos-qty-btn {
+    padding: 0.22rem 0.15rem !important;
     font-size: 0.7rem !important;
+    min-width: 0 !important;
   }
   .menu-grid {
     grid-template-columns: repeat(3, 1fr) !important;

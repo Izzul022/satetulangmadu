@@ -539,12 +539,10 @@ const ClientApp = {
           </div>
         </div>
 
-        <div style="display:flex; gap:3px; flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="ClientApp.addToPOSCart(${item.id}, 1)">+1</button>
-          ${item.unit_name === 'cucuk' ? `
-            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="ClientApp.addToPOSCart(${item.id}, 5)">+5</button>
-            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="ClientApp.addToPOSCart(${item.id}, 10)">+10</button>
-          ` : ''}
+        <div class="pos-qty-actions">
+          <button type="button" class="btn btn-secondary btn-sm pos-qty-btn" onclick="ClientApp.addToPOSCart(${item.id}, 1)">+1</button>
+          <button type="button" class="btn btn-secondary btn-sm pos-qty-btn" onclick="ClientApp.addToPOSCart(${item.id}, 5)">+5</button>
+          <button type="button" class="btn btn-secondary btn-sm pos-qty-btn" onclick="ClientApp.addToPOSCart(${item.id}, 10)">+10</button>
         </div>
       </div>
     `).join('');
