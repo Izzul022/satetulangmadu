@@ -64,15 +64,24 @@ try {
 
     $pdo->beginTransaction();
 
-    $items    = $pdo->exec("DELETE FROM order_items");
-    $notifs   = $pdo->exec("DELETE FROM order_notifications");
-    $orders   = $pdo->exec("DELETE FROM orders");
+    // Helper: delete safely even if table doesn't exist
+    $safeDel = function(string $table) use ($pdo): int {
+        try {
+            return (int) $pdo->exec("DELETE FROM $table");
+        } catch (Exception $e) {
+            return 0; // Table doesn't exist — skip silently
+        }
+    };
+
+    $items    = $safeDel('order_items');
+    $notifs   = $safeDel('order_notifications');
+    $orders   = $safeDel('orders');
 
     // Reset auto-increment sequences
     if ($driver === 'mysql') {
-        $pdo->exec("ALTER TABLE orders AUTO_INCREMENT = 1");
-        $pdo->exec("ALTER TABLE order_items AUTO_INCREMENT = 1");
-        $pdo->exec("ALTER TABLE order_notifications AUTO_INCREMENT = 1");
+        foreach (['orders', 'order_items', 'order_notifications'] as $tbl) {
+            try { $pdo->exec("ALTER TABLE $tbl AUTO_INCREMENT = 1"); } catch (Exception $e) {}
+        }
     } else {
         // SQLite
         $pdo->exec("DELETE FROM sqlite_sequence WHERE name IN ('orders','order_items','order_notifications')");
