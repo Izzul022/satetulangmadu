@@ -530,22 +530,58 @@ const ClientApp = {
     const grid = document.getElementById('pos-menu-grid');
     if (!grid) return;
 
-    grid.innerHTML = this.menuItems.map(item => `
-      <div class="pos-dish-card">
-        <div>
-          <div class="pos-dish-title">${SatayApp.escapeHtml(item.name)}</div>
-          <div class="pos-dish-price">
-            ${SatayApp.formatPrice(item.price_per_unit)} <span>/ ${SatayApp.escapeHtml(item.unit_name)}</span>
+    grid.innerHTML = this.menuItems.map(item => {
+      const cartItem = this.posCart.find(i => i.menu_item_id == item.id);
+      const qty = cartItem ? cartItem.quantity : 0;
+      const inCart = qty > 0;
+
+      return `
+        <div class="pos-dish-card ${inCart ? 'in-cart' : ''}" id="pos-card-${item.id}">
+          <div>
+            <div class="pos-dish-title">
+              <span>${SatayApp.escapeHtml(item.name)}</span>
+              <span class="pos-dish-qty-badge" id="pos-qty-${item.id}" style="${inCart ? '' : 'display:none;'}">
+                <span class="pos-qty-prefix">Total: </span><span class="pos-qty-val">${qty}</span>
+              </span>
+            </div>
+            <div class="pos-dish-price">
+              ${SatayApp.formatPrice(item.price_per_unit)} <span>/ ${SatayApp.escapeHtml(item.unit_name)}</span>
+            </div>
+          </div>
+
+          <div class="pos-qty-actions">
+            <button type="button" class="btn btn-secondary btn-sm pos-qty-btn" onclick="ClientApp.addToPOSCart(${item.id}, 1)">+1</button>
+            <button type="button" class="btn btn-secondary btn-sm pos-qty-btn" onclick="ClientApp.addToPOSCart(${item.id}, 5)">+5</button>
+            <button type="button" class="btn btn-secondary btn-sm pos-qty-btn" onclick="ClientApp.addToPOSCart(${item.id}, 10)">+10</button>
           </div>
         </div>
+      `;
+    }).join('');
+  },
 
-        <div class="pos-qty-actions">
-          <button type="button" class="btn btn-secondary btn-sm pos-qty-btn" onclick="ClientApp.addToPOSCart(${item.id}, 1)">+1</button>
-          <button type="button" class="btn btn-secondary btn-sm pos-qty-btn" onclick="ClientApp.addToPOSCart(${item.id}, 5)">+5</button>
-          <button type="button" class="btn btn-secondary btn-sm pos-qty-btn" onclick="ClientApp.addToPOSCart(${item.id}, 10)">+10</button>
-        </div>
-      </div>
-    `).join('');
+  updatePOSGridBadges() {
+    if (!this.menuItems || !this.menuItems.length) return;
+    this.menuItems.forEach(item => {
+      const badge = document.getElementById(`pos-qty-${item.id}`);
+      const card = document.getElementById(`pos-card-${item.id}`);
+      if (!badge) return;
+
+      const cartItem = this.posCart.find(i => i.menu_item_id == item.id);
+      const qty = cartItem ? cartItem.quantity : 0;
+
+      if (qty > 0) {
+        const valEl = badge.querySelector('.pos-qty-val');
+        if (valEl) valEl.textContent = qty;
+        badge.style.display = 'inline-flex';
+        badge.classList.remove('pos-badge-pulse');
+        void badge.offsetWidth; // Trigger reflow for animation
+        badge.classList.add('pos-badge-pulse');
+        if (card) card.classList.add('in-cart');
+      } else {
+        badge.style.display = 'none';
+        if (card) card.classList.remove('in-cart');
+      }
+    });
   },
 
   addToPOSCart(itemId, qty = 1) {
@@ -621,6 +657,7 @@ const ClientApp = {
     if (totalEl) totalEl.innerText = SatayApp.formatPrice(total);
 
     this.calculatePOSChange();
+    this.updatePOSGridBadges();
   },
 
   calculatePOSChange() {
