@@ -1256,10 +1256,10 @@ const AdminApp = {
     }
 
     const roleBadges = {
-      admin: '<span class="badge role-tag-admin" style="font-size:0.75rem;">👑 ADMIN</span>',
-      staff_drinks: '<span class="badge" style="font-size:0.75rem; background:rgba(59,130,246,0.2); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);">🥤 DRINK STAFF</span>',
-      staff: '<span class="badge role-tag-staff" style="font-size:0.75rem;">🍢 GRILL/STAFF</span>',
-      customer: '<span class="badge role-tag-customer" style="font-size:0.75rem;">🛒 CUSTOMER</span>'
+      admin: '<span class="role-badge role-tag-admin">Administrator</span>',
+      staff_drinks: '<span class="role-badge role-tag-drinks">Drink Station</span>',
+      staff: '<span class="role-badge role-tag-staff">Kitchen Grill</span>',
+      customer: '<span class="role-badge role-tag-customer">Customer</span>'
     };
 
     tbody.innerHTML = filtered.map(u => `
