@@ -162,14 +162,45 @@ $currentUser = get_current_auth_user();
         <main class="store-content container-fluid">
         <!-- 1. DASHBOARD & ANALYTICS TAB -->
         <section id="tab-dashboard">
-            <div style="margin-bottom:1.5rem; display:flex; justify-content:space-between; align-items:center;">
+            <div style="margin-bottom:1.5rem; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; gap:1rem;">
                 <div>
                     <h2>Executive Business Overview</h2>
-                    <p style="color:var(--text-muted); font-size:0.9rem;">Real-time sales figures, meat stick volume, and operational metrics.</p>
+                    <p style="color:var(--text-muted); font-size:0.9rem;">Real-time sales figures, meat stick volume, and daily performance metrics separated by date.</p>
                 </div>
-                <button class="btn btn-secondary btn-sm" onclick="AdminApp.fetchDashboardStats()">
-                    Refresh Data
-                </button>
+                <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
+                    <!-- Date Presets -->
+                    <div class="date-filter-group" style="display:inline-flex; background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:3px; gap:2px;">
+                        <button type="button" class="btn btn-sm overview-date-preset active" data-range="today" onclick="AdminApp.setDateFilter('today')">Today</button>
+                        <button type="button" class="btn btn-sm overview-date-preset btn-ghost" data-range="yesterday" onclick="AdminApp.setDateFilter('yesterday')">Yesterday</button>
+                        <button type="button" class="btn btn-sm overview-date-preset btn-ghost" data-range="this_week" onclick="AdminApp.setDateFilter('this_week')">This Week</button>
+                        <button type="button" class="btn btn-sm overview-date-preset btn-ghost" data-range="this_month" onclick="AdminApp.setDateFilter('this_month')">This Month</button>
+                        <button type="button" class="btn btn-sm overview-date-preset btn-ghost" data-range="all" onclick="AdminApp.setDateFilter('all')">All Time</button>
+                        <button type="button" class="btn btn-sm overview-date-preset btn-ghost" data-range="custom" onclick="AdminApp.toggleCustomDateInputs()">Custom Date</button>
+                    </div>
+
+                    <!-- Custom Date Range Form (collapsible) -->
+                    <div id="overview-custom-date-container" style="display:none; align-items:center; gap:0.4rem; background:var(--bg-surface); padding:4px 8px; border-radius:var(--radius-md); border:1px solid var(--border-color);">
+                        <input type="date" id="overview-start-date" class="form-input" style="padding:0.3rem 0.5rem; font-size:0.82rem; width:135px;">
+                        <span style="color:var(--text-muted); font-size:0.8rem;">to</span>
+                        <input type="date" id="overview-end-date" class="form-input" style="padding:0.3rem 0.5rem; font-size:0.82rem; width:135px;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="AdminApp.applyCustomDateFilter()">Apply</button>
+                    </div>
+
+                    <button class="btn btn-secondary btn-sm" onclick="AdminApp.fetchDashboardStats()" title="Refresh Data">
+                        ↺ Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active Date Filter Pill Banner -->
+            <div style="margin-bottom:1.25rem; display:flex; align-items:center; justify-content:space-between; background:rgba(212, 175, 55, 0.08); border:1px solid rgba(212, 175, 55, 0.25); border-radius:var(--radius-md); padding:0.6rem 1rem;">
+                <div style="font-size:0.88rem; display:flex; align-items:center; gap:0.5rem;">
+                    <span style="color:var(--gold); font-weight:700;">📅 Active Period:</span>
+                    <span id="overview-active-date-label" style="font-weight:600; color:var(--text-main);">Today</span>
+                </div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">
+                    All overview metrics, stick counts & charts reflect this timeframe.
+                </div>
             </div>
 
             <!-- KPI Cards Grid -->
@@ -178,7 +209,7 @@ $currentUser = get_current_auth_user();
                     <div class="kpi-icon" style="background:var(--gold-light); color:var(--gold);">RM</div>
                     <div class="kpi-info">
                         <h3 id="kpi-today-revenue">RM 0.00</h3>
-                        <p>TODAY'S REVENUE</p>
+                        <p id="kpi-revenue-label">PERIOD REVENUE</p>
                     </div>
                 </div>
 
@@ -186,7 +217,7 @@ $currentUser = get_current_auth_user();
                     <div class="kpi-icon" style="background:var(--primary-light); color:var(--primary);">Qty</div>
                     <div class="kpi-info">
                         <h3 id="kpi-today-sticks">0 Sticks</h3>
-                        <p>TOTAL STICKS SOLD</p>
+                        <p id="kpi-sticks-label">STICKS SOLD</p>
                     </div>
                 </div>
 
@@ -194,7 +225,7 @@ $currentUser = get_current_auth_user();
                     <div class="kpi-icon" style="background:var(--info-light); color:var(--info);">#</div>
                     <div class="kpi-info">
                         <h3 id="kpi-today-orders">0 Orders</h3>
-                        <p>TODAY'S ORDERS</p>
+                        <p id="kpi-orders-label">ORDERS PLACED</p>
                     </div>
                 </div>
 
@@ -215,12 +246,41 @@ $currentUser = get_current_auth_user();
                 </div>
             </div>
 
+            <!-- Daily Performance Breakdown by Date Table -->
+            <div class="table-card" style="margin-bottom:2rem;">
+                <div class="table-header">
+                    <div>
+                        <h3 style="margin:0 0 0.2rem;">Daily Business Breakdown by Date</h3>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">Separated performance log grouped by calendar day (Revenue, Orders, Completed, Status).</p>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="AdminApp.exportCSV()">Export Orders CSV</button>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Total Orders</th>
+                                <th>Completed</th>
+                                <th>Cancelled</th>
+                                <th>Daily Revenue</th>
+                                <th>Avg Order Value</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="daily-breakdown-tbody">
+                            <!-- Populated via AdminApp.renderDailyBreakdownTable -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Analytics Distribution Section -->
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; margin-bottom:2rem;">
                 <!-- Stick Breakdown Card -->
                 <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:1.5rem;">
                     <h3 style="font-size:1.15rem; margin-bottom:0.25rem;">Meat Skewers Volume Distribution</h3>
-                    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">Breakdown of total sticks ordered across all meats & platters</p>
+                    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">Breakdown of total sticks ordered across all meats & platters for selected period</p>
                     <div id="stick-breakdown-container">
                         <!-- Populated via admin.js -->
                     </div>
@@ -229,7 +289,7 @@ $currentUser = get_current_auth_user();
                 <!-- Top Best Selling Items -->
                 <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:1.5rem;">
                     <h3 style="font-size:1.15rem; margin-bottom:0.25rem;">Top Best Selling Menu Items</h3>
-                    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">Ranked by units sold & total revenue contribution</p>
+                    <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">Ranked by units sold & total revenue contribution for selected period</p>
                     <div id="top-items-list">
                         <!-- Populated via admin.js -->
                     </div>
@@ -313,6 +373,9 @@ $currentUser = get_current_auth_user();
             <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:1rem; margin-bottom:1.25rem; display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
                 <div style="flex:1; min-width:200px;">
                     <input type="text" id="filter-order-search" class="form-input" placeholder="Search by Order #, Name, Phone, Table...">
+                </div>
+                <div>
+                    <input type="date" id="filter-order-date" class="form-input" title="Filter orders by specific date">
                 </div>
                 <div>
                     <select id="filter-order-status" class="form-select">
@@ -443,7 +506,7 @@ $currentUser = get_current_auth_user();
                                 </button>
                             </div>
                             <small style="color:var(--text-muted); font-size:0.78rem; display:block; margin-top:4px;">
-                                Leave blank to automatically use the current server's origin. For Render, enter your Render URL (e.g. <code>https://satay-order.onrender.com/</code>).
+                            Leave blank to automatically use the current server's origin. For Render, enter your Render URL (e.g. <code>https://satetulangmadu.onrender.com/</code>).
                             </small>
                         </div>
                     </div>

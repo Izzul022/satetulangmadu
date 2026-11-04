@@ -287,11 +287,17 @@ function handle_get_orders(PDO $pdo) {
     $status = $_GET['status'] ?? 'all';
     $dining_type = $_GET['dining_type'] ?? 'all';
     $search = trim($_GET['search'] ?? '');
+    $date_filter = trim($_GET['date'] ?? '');
     $limit = isset($_GET['limit']) ? min(100, max(1, (int)$_GET['limit'])) : 50;
     $offset = isset($_GET['offset']) ? max(0, (int)$_GET['offset']) : 0;
 
     $sql = "SELECT * FROM orders WHERE 1=1";
     $params = [];
+
+    if (!empty($date_filter)) {
+        $sql .= " AND DATE(created_at) = ?";
+        $params[] = $date_filter;
+    }
 
     if ($status !== 'all') {
         if ($status === 'active') {

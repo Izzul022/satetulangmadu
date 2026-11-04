@@ -46,20 +46,89 @@ switch ($method) {
 function handle_get_dashboard_stats(PDO $pdo) {
     $today = date('Y-m-d');
     
-    // 1. Overview KPIs (Today & All-time)
-    $today_stmt = $pdo->prepare("
+    // Parse Date Filters
+    $filter_type = $_GET['filter_type'] ?? 'today'; // 'today', 'yesterday', 'this_week', 'this_month', 'custom', 'all'
+    $start_date = $_GET['start_date'] ?? null;
+    $end_date = $_GET['end_date'] ?? null;
+
+    $where_orders = [];
+    $params_orders = [];
+    $where_items = [];
+    $params_items = [];
+
+    if ($filter_type === 'today') {
+        $where_orders[] = "DATE(o.created_at) = ?";
+        $params_orders[] = $today;
+        $where_items[] = "DATE(o.created_at) = ?";
+        $params_items[] = $today;
+        $date_label = "Today (" . date('d M Y') . ")";
+    } elseif ($filter_type === 'yesterday') {
+        $yesterday = date('Y-m-d', strtotime('-1 day'));
+        $where_orders[] = "DATE(o.created_at) = ?";
+        $params_orders[] = $yesterday;
+        $where_items[] = "DATE(o.created_at) = ?";
+        $params_items[] = $yesterday;
+        $date_label = "Yesterday (" . date('d M Y', strtotime('-1 day')) . ")";
+    } elseif ($filter_type === 'this_week') {
+        $week_start = date('Y-m-d', strtotime('monday this week'));
+        $where_orders[] = "DATE(o.created_at) >= ? AND DATE(o.created_at) <= ?";
+        $params_orders[] = $week_start;
+        $params_orders[] = $today;
+        $where_items[] = "DATE(o.created_at) >= ? AND DATE(o.created_at) <= ?";
+        $params_items[] = $week_start;
+        $params_items[] = $today;
+        $date_label = "This Week (" . date('d M', strtotime($week_start)) . " - " . date('d M Y') . ")";
+    } elseif ($filter_type === 'this_month') {
+        $month_start = date('Y-m-01');
+        $where_orders[] = "DATE(o.created_at) >= ? AND DATE(o.created_at) <= ?";
+        $params_orders[] = $month_start;
+        $params_orders[] = $today;
+        $where_items[] = "DATE(o.created_at) >= ? AND DATE(o.created_at) <= ?";
+        $params_items[] = $month_start;
+        $params_items[] = $today;
+        $date_label = "This Month (" . date('F Y') . ")";
+    } elseif ($filter_type === 'custom') {
+        if (!empty($start_date) && !empty($end_date)) {
+            $where_orders[] = "DATE(o.created_at) >= ? AND DATE(o.created_at) <= ?";
+            $params_orders[] = $start_date;
+            $params_orders[] = $end_date;
+            $where_items[] = "DATE(o.created_at) >= ? AND DATE(o.created_at) <= ?";
+            $params_items[] = $start_date;
+            $params_items[] = $end_date;
+            $date_label = date('d M Y', strtotime($start_date)) . " - " . date('d M Y', strtotime($end_date));
+        } elseif (!empty($start_date)) {
+            $where_orders[] = "DATE(o.created_at) = ?";
+            $params_orders[] = $start_date;
+            $where_items[] = "DATE(o.created_at) = ?";
+            $params_items[] = $start_date;
+            $date_label = date('d M Y', strtotime($start_date));
+        } else {
+            $date_label = "Custom Date Range";
+        }
+    } else {
+        // 'all'
+        $date_label = "All Time";
+    }
+
+    $orders_sql_filter = !empty($where_orders) ? ("WHERE " . implode(" AND ", $where_orders)) : "";
+    $items_sql_filter = !empty($where_items) ? ("AND " . implode(" AND ", $where_items)) : "";
+
+    // 1. Overview KPIs for Selected Date Period
+    $period_query = "
         SELECT 
             COUNT(*) as total_orders,
-            COALESCE(SUM(CASE WHEN order_status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
-            COALESCE(SUM(CASE WHEN order_status = 'completed' THEN 1 ELSE 0 END), 0) as completed_orders,
-            COALESCE(SUM(CASE WHEN order_status IN ('pending', 'confirmed', 'grilling', 'ready') THEN 1 ELSE 0 END), 0) as active_orders,
-            COALESCE(AVG(CASE WHEN order_status != 'cancelled' THEN total_amount ELSE NULL END), 0) as avg_order_value
-        FROM orders 
-        WHERE DATE(created_at) = ?
-    ");
-    $today_stmt->execute([$today]);
-    $today_stats = $today_stmt->fetch();
+            COALESCE(SUM(CASE WHEN o.order_status != 'cancelled' THEN o.total_amount ELSE 0 END), 0) as total_revenue,
+            COALESCE(SUM(CASE WHEN o.order_status = 'completed' THEN 1 ELSE 0 END), 0) as completed_orders,
+            COALESCE(SUM(CASE WHEN o.order_status IN ('pending', 'confirmed', 'grilling', 'ready') THEN 1 ELSE 0 END), 0) as active_orders,
+            COALESCE(AVG(CASE WHEN o.order_status != 'cancelled' THEN o.total_amount ELSE NULL END), 0) as avg_order_value
+        FROM orders o
+        {$orders_sql_filter}
+    ";
+    $period_stmt = $pdo->prepare($period_query);
+    $period_stmt->execute($params_orders);
+    $period_stats = $period_stmt->fetch();
 
+    // All-time Stats
     $all_time_stmt = $pdo->query("
         SELECT 
             COUNT(*) as total_orders,
@@ -69,15 +138,17 @@ function handle_get_dashboard_stats(PDO $pdo) {
     ");
     $all_time_stats = $all_time_stmt->fetch();
 
-    // 2. Meat Sticks Breakdown (Total units sold)
-    $items_stmt = $pdo->query("
+    // 2. Meat Sticks Breakdown (Filtered by selected date)
+    $items_query = "
         SELECT oi.meat_type, oi.item_name, SUM(oi.quantity) as total_qty, SUM(oi.total_price) as total_sales
         FROM order_items oi
         JOIN orders o ON oi.order_id = o.id
-        WHERE o.order_status != 'cancelled'
+        WHERE o.order_status != 'cancelled' {$items_sql_filter}
         GROUP BY oi.meat_type, oi.item_name
         ORDER BY total_qty DESC
-    ");
+    ";
+    $items_stmt = $pdo->prepare($items_query);
+    $items_stmt->execute($params_items);
     $raw_items = $items_stmt->fetchAll();
 
     $stick_counts = [
@@ -126,54 +197,83 @@ function handle_get_dashboard_stats(PDO $pdo) {
         }
     }
 
-    // 3. Last 7 Days Revenue Trend
-    $driver = strtolower($pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
-    $date_clause = ($driver === 'mysql') ? "created_at >= NOW() - INTERVAL 6 DAY" : "created_at >= date('now', '-6 days')";
-    $trend_stmt = $pdo->query("
+    // 3. Daily Breakdown / Trend
+    // Query date-by-date aggregation for trend and daily tabular reporting
+    $trend_sql = "
         SELECT 
-            DATE(created_at) as order_date,
+            DATE(o.created_at) as order_date,
             COUNT(*) as orders_count,
-            COALESCE(SUM(CASE WHEN order_status != 'cancelled' THEN total_amount ELSE 0 END), 0) as daily_revenue
-        FROM orders
-        WHERE {$date_clause}
-        GROUP BY DATE(created_at)
-        ORDER BY order_date ASC
-    ");
-    $daily_trends = $trend_stmt->fetchAll();
+            COALESCE(SUM(CASE WHEN o.order_status != 'cancelled' THEN o.total_amount ELSE 0 END), 0) as daily_revenue,
+            COALESCE(SUM(CASE WHEN o.order_status = 'completed' THEN 1 ELSE 0 END), 0) as completed_count,
+            COALESCE(SUM(CASE WHEN o.order_status = 'cancelled' THEN 1 ELSE 0 END), 0) as cancelled_count
+        FROM orders o
+        {$orders_sql_filter}
+        GROUP BY DATE(o.created_at)
+        ORDER BY order_date DESC
+    ";
+    $trend_stmt = $pdo->prepare($trend_sql);
+    $trend_stmt->execute($params_orders);
+    $daily_breakdown = $trend_stmt->fetchAll();
 
-    // 4. Dining Type Distribution
-    $dining_stmt = $pdo->query("
+    // 4. Dining Type Distribution (Filtered)
+    $dining_sql = "
         SELECT dining_type, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue
-        FROM orders
-        WHERE order_status != 'cancelled'
+        FROM orders o
+        WHERE o.order_status != 'cancelled' {$items_sql_filter}
         GROUP BY dining_type
-    ");
+    ";
+    $dining_stmt = $pdo->prepare($dining_sql);
+    $dining_stmt->execute($params_items);
     $dining_distribution = $dining_stmt->fetchAll();
 
-    // 5. Top 5 Best Selling Items
-    $top_stmt = $pdo->query("
+    // 5. Top 5 Best Selling Items (Filtered)
+    $top_sql = "
         SELECT oi.item_name, SUM(oi.quantity) as total_qty, SUM(oi.total_price) as total_revenue
         FROM order_items oi
         JOIN orders o ON oi.order_id = o.id
-        WHERE o.order_status != 'cancelled'
+        WHERE o.order_status != 'cancelled' {$items_sql_filter}
         GROUP BY oi.item_name
         ORDER BY total_qty DESC
         LIMIT 5
-    ");
+    ";
+    $top_stmt = $pdo->prepare($top_sql);
+    $top_stmt->execute($params_items);
     $top_items = $top_stmt->fetchAll();
 
-    // 6. Recent 10 Orders
-    $recent_stmt = $pdo->query("SELECT * FROM orders ORDER BY created_at DESC LIMIT 10");
+    // 6. Recent Orders (Filtered)
+    $recent_sql = "
+        SELECT * FROM orders o
+        {$orders_sql_filter}
+        ORDER BY o.created_at DESC 
+        LIMIT 10
+    ";
+    $recent_stmt = $pdo->prepare($recent_sql);
+    $recent_stmt->execute($params_orders);
     $recent_orders = $recent_stmt->fetchAll();
 
     json_response([
         'success' => true,
+        'date_filter' => [
+            'type' => $filter_type,
+            'label' => $date_label,
+            'start_date' => $start_date,
+            'end_date' => $end_date
+        ],
+        'period_stats' => [
+            'total_orders' => (int)$period_stats['total_orders'],
+            'total_revenue' => (float)$period_stats['total_revenue'],
+            'completed_orders' => (int)$period_stats['completed_orders'],
+            'active_orders' => (int)$period_stats['active_orders'],
+            'avg_order_value' => (float)$period_stats['avg_order_value'],
+            'total_sticks_sold' => $total_calculated_sticks
+        ],
+        // Backward-compatible 'today' alias
         'today' => [
-            'total_orders' => (int)$today_stats['total_orders'],
-            'total_revenue' => (float)$today_stats['total_revenue'],
-            'completed_orders' => (int)$today_stats['completed_orders'],
-            'active_orders' => (int)$today_stats['active_orders'],
-            'avg_order_value' => (float)$today_stats['avg_order_value'],
+            'total_orders' => (int)$period_stats['total_orders'],
+            'total_revenue' => (float)$period_stats['total_revenue'],
+            'completed_orders' => (int)$period_stats['completed_orders'],
+            'active_orders' => (int)$period_stats['active_orders'],
+            'avg_order_value' => (float)$period_stats['avg_order_value'],
             'total_sticks_sold' => $total_calculated_sticks
         ],
         'all_time' => [
@@ -182,7 +282,8 @@ function handle_get_dashboard_stats(PDO $pdo) {
             'completed_orders' => (int)$all_time_stats['completed_orders']
         ],
         'stick_breakdown' => $stick_counts,
-        'daily_trends' => $daily_trends,
+        'daily_trends' => array_reverse($daily_breakdown),
+        'daily_breakdown' => $daily_breakdown,
         'dining_distribution' => $dining_distribution,
         'top_items' => $top_items,
         'recent_orders' => $recent_orders

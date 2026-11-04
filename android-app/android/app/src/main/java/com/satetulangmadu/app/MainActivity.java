@@ -39,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "SatayAppPrefs";
     private static final String KEY_SERVER_URL = "server_url";
-    private static final String DEFAULT_SERVER_URL = "https://satay-order.onrender.com";
+    private static final String DEFAULT_SERVER_URL = "https://satetulangmadu.onrender.com";
     private static final int PERMISSION_REQ_CODE = 101;
 
     private WebView webView;

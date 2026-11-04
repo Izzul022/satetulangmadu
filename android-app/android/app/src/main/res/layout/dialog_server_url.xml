@@ -21,7 +21,7 @@
             android:id="@+id/etServerUrl"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="https://satay-order.onrender.com"
+            android:hint="https://satetulangmadu.onrender.com"
             android:inputType="textUri"
             android:singleLine="true" />
     </com.google.android.material.textfield.TextInputLayout>
@@ -30,7 +30,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Examples:\n• Online Render: https://satay-order.onrender.com\n• Local Wi-Fi: http://192.168.1.100/Order_system_app"
+        android:text="Examples:\n• Online Render: https://satetulangmadu.onrender.com\n• Local Wi-Fi: http://192.168.1.100/Order_system_app"
         android:textColor="@color/text_muted"
         android:textSize="11sp" />
 </LinearLayout>

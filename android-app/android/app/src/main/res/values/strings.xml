@@ -6,7 +6,7 @@
     <string name="action_settings">Server Settings</string>
     <string name="action_refresh">Refresh</string>
     <string name="server_url_title">Server Configuration</string>
-    <string name="server_url_hint">e.g. https://satay-order.onrender.com</string>
+    <string name="server_url_hint">e.g. https://satetulangmadu.onrender.com</string>
     <string name="offline_msg">Unable to connect to ordering server.\nPlease check your connection or server URL.</string>
     <string name="btn_retry">Retry Connection</string>
 </resources>

@@ -17,6 +17,9 @@ const AdminApp = {
   tables: [],
   users: [],
   userRoleFilter: 'all',
+  overviewDateFilter: 'today',
+  overviewStartDate: '',
+  overviewEndDate: '',
 
   init() {
     this.fetchDashboardStats();
@@ -67,10 +70,12 @@ const AdminApp = {
     // Order filters
     const orderStatusFilter = document.getElementById('filter-order-status');
     const orderDiningFilter = document.getElementById('filter-order-dining');
+    const orderDateFilter = document.getElementById('filter-order-date');
     const orderSearch = document.getElementById('filter-order-search');
 
     if (orderStatusFilter) orderStatusFilter.addEventListener('change', () => this.fetchOrders());
     if (orderDiningFilter) orderDiningFilter.addEventListener('change', () => this.fetchOrders());
+    if (orderDateFilter) orderDateFilter.addEventListener('change', () => this.fetchOrders());
     if (orderSearch) orderSearch.addEventListener('input', () => this.fetchOrders());
   },
 
@@ -106,12 +111,57 @@ const AdminApp = {
   },
 
   // 1. Dashboard Analytics
+  setDateFilter(range) {
+    this.overviewDateFilter = range;
+    document.querySelectorAll('.overview-date-preset').forEach(btn => {
+      const match = btn.dataset.range === range;
+      btn.classList.toggle('active', match);
+      btn.classList.toggle('btn-primary', match);
+      btn.classList.toggle('btn-ghost', !match);
+    });
+
+    const customContainer = document.getElementById('overview-custom-date-container');
+    if (customContainer) {
+      customContainer.style.display = (range === 'custom') ? 'inline-flex' : 'none';
+    }
+
+    if (range !== 'custom') {
+      this.fetchDashboardStats();
+    }
+  },
+
+  toggleCustomDateInputs() {
+    this.setDateFilter('custom');
+  },
+
+  applyCustomDateFilter() {
+    const start = document.getElementById('overview-start-date')?.value;
+    const end = document.getElementById('overview-end-date')?.value;
+    if (!start && !end) {
+      if (typeof SatayApp !== 'undefined') {
+        SatayApp.showToast('Please select at least a start date', 'warning');
+      }
+      return;
+    }
+    this.overviewStartDate = start || '';
+    this.overviewEndDate = end || '';
+    this.fetchDashboardStats();
+  },
+
   async fetchDashboardStats() {
     try {
-      const res = await fetch('api/stats.php');
+      const params = new URLSearchParams();
+      params.append('filter_type', this.overviewDateFilter);
+      if (this.overviewDateFilter === 'custom') {
+        if (this.overviewStartDate) params.append('start_date', this.overviewStartDate);
+        if (this.overviewEndDate) params.append('end_date', this.overviewEndDate);
+      }
+
+      const res = await fetch(`api/stats.php?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         this.renderDashboardKPIs(data);
+        this.renderDailyBreakdownTable(data.daily_breakdown || []);
         this.renderStickBreakdown(data.stick_breakdown);
         this.renderTopItems(data.top_items);
         this.renderRecentOrders(data.recent_orders);
@@ -122,17 +172,84 @@ const AdminApp = {
   },
 
   renderDashboardKPIs(data) {
+    const stats = data.period_stats || data.today || {};
+    const dateLabel = data.date_filter?.label || 'Today';
+
+    const activeDateEl = document.getElementById('overview-active-date-label');
+    if (activeDateEl) activeDateEl.textContent = dateLabel;
+
+    const revLabel = document.getElementById('kpi-revenue-label');
+    const sticksLabel = document.getElementById('kpi-sticks-label');
+    const ordersLabel = document.getElementById('kpi-orders-label');
+
+    if (revLabel) revLabel.innerText = `${dateLabel.toUpperCase()} REVENUE`;
+    if (sticksLabel) sticksLabel.innerText = `${dateLabel.toUpperCase()} STICKS`;
+    if (ordersLabel) ordersLabel.innerText = `${dateLabel.toUpperCase()} ORDERS`;
+
     const todayRev = document.getElementById('kpi-today-revenue');
     const todaySticks = document.getElementById('kpi-today-sticks');
     const todayOrders = document.getElementById('kpi-today-orders');
     const activeOrders = document.getElementById('kpi-active-orders');
     const aov = document.getElementById('kpi-aov');
 
-    if (todayRev) todayRev.innerText = SatayApp.formatPrice(data.today.total_revenue);
-    if (todaySticks) todaySticks.innerText = `${data.today.total_sticks_sold} Sticks`;
-    if (todayOrders) todayOrders.innerText = `${data.today.total_orders} Orders`;
-    if (activeOrders) activeOrders.innerText = `${data.today.active_orders} In Kitchen`;
-    if (aov) aov.innerText = SatayApp.formatPrice(data.today.avg_order_value);
+    if (todayRev) todayRev.innerText = SatayApp.formatPrice(stats.total_revenue || 0);
+    if (todaySticks) todaySticks.innerText = `${stats.total_sticks_sold || 0} Sticks`;
+    if (todayOrders) todayOrders.innerText = `${stats.total_orders || 0} Orders`;
+    if (activeOrders) activeOrders.innerText = `${stats.active_orders || 0} In Kitchen`;
+    if (aov) aov.innerText = SatayApp.formatPrice(stats.avg_order_value || 0);
+  },
+
+  renderDailyBreakdownTable(dailyList) {
+    const tbody = document.getElementById('daily-breakdown-tbody');
+    if (!tbody) return;
+
+    if (!dailyList || dailyList.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--text-muted);">No sales data recorded for the selected date timeframe.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = dailyList.map(row => {
+      const ordersCount = parseInt(row.orders_count, 10) || 0;
+      const revenue = parseFloat(row.daily_revenue) || 0;
+      const completed = parseInt(row.completed_count, 10) || 0;
+      const cancelled = parseInt(row.cancelled_count, 10) || 0;
+      const nonCancelledOrders = Math.max(1, ordersCount - cancelled);
+      const avgValue = revenue > 0 ? (revenue / nonCancelledOrders) : 0;
+
+      // Format date for readable label
+      const d = new Date(row.order_date + 'T00:00:00');
+      const formattedDate = !isNaN(d)
+        ? d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+        : row.order_date;
+
+      return `
+        <tr>
+          <td>
+            <div style="font-weight:700; color:var(--text-main);">${formattedDate}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); font-family:monospace;">${row.order_date}</div>
+          </td>
+          <td><strong style="color:var(--text-main);">${ordersCount}</strong></td>
+          <td><span class="badge badge-success" style="font-size:0.75rem;">${completed} completed</span></td>
+          <td>${cancelled > 0 ? `<span class="badge badge-danger" style="font-size:0.75rem;">${cancelled} cancelled</span>` : `<span style="color:var(--text-muted); font-size:0.85rem;">0</span>`}</td>
+          <td><strong style="color:var(--gold); font-size:0.95rem;">${SatayApp.formatPrice(revenue)}</strong></td>
+          <td><span style="color:var(--text-muted);">${SatayApp.formatPrice(avgValue)}</span></td>
+          <td>
+            <button class="btn btn-secondary btn-sm" onclick="AdminApp.filterOrdersBySpecificDate('${row.order_date}')" title="View all orders placed on this date">
+              View Orders →
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  filterOrdersBySpecificDate(dateStr) {
+    this.switchTab('orders');
+    const dateInput = document.getElementById('filter-order-date');
+    if (dateInput) {
+      dateInput.value = dateStr;
+      this.fetchOrders();
+    }
   },
 
   renderStickBreakdown(sticks) {
@@ -436,10 +553,11 @@ const AdminApp = {
   async fetchOrders() {
     const status = document.getElementById('filter-order-status')?.value || 'all';
     const dining = document.getElementById('filter-order-dining')?.value || 'all';
+    const date = document.getElementById('filter-order-date')?.value || '';
     const search = document.getElementById('filter-order-search')?.value.trim() || '';
 
     try {
-      const res = await fetch(`api/orders.php?status=${status}&dining_type=${dining}&search=${encodeURIComponent(search)}`);
+      const res = await fetch(`api/orders.php?status=${status}&dining_type=${dining}&date=${encodeURIComponent(date)}&search=${encodeURIComponent(search)}`);
       const data = await res.json();
       if (data.success) {
         this.orders = data.orders;
