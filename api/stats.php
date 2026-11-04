@@ -153,12 +153,8 @@ function handle_get_dashboard_stats(PDO $pdo) {
 
     $stick_counts = [
         'Sate Tulang Madu' => 0,
-        'Ayam (Chicken)' => 0,
-        'Daging (Beef)' => 0,
-        'Kambing (Mutton)' => 0,
-        'Perut (Tripe)' => 0,
-        'Bebek (Duck)' => 0,
-        'Rusa (Venison)' => 0
+        'Sate Ayam' => 0,
+        'Sate Daging' => 0
     ];
     $total_calculated_sticks = 0;
 
@@ -171,22 +167,10 @@ function handle_get_dashboard_stats(PDO $pdo) {
             $stick_counts['Sate Tulang Madu'] += $qty;
             $total_calculated_sticks += $qty;
         } elseif ($meat === 'ayam' || strpos($name, 'ayam') !== false) {
-            $stick_counts['Ayam (Chicken)'] += $qty;
+            $stick_counts['Sate Ayam'] += $qty;
             $total_calculated_sticks += $qty;
         } elseif ($meat === 'daging' || strpos($name, 'daging') !== false || strpos($name, 'beef') !== false) {
-            $stick_counts['Daging (Beef)'] += $qty;
-            $total_calculated_sticks += $qty;
-        } elseif ($meat === 'kambing' || strpos($name, 'kambing') !== false) {
-            $stick_counts['Kambing (Mutton)'] += $qty;
-            $total_calculated_sticks += $qty;
-        } elseif ($meat === 'perut' || strpos($name, 'perut') !== false) {
-            $stick_counts['Perut (Tripe)'] += $qty;
-            $total_calculated_sticks += $qty;
-        } elseif ($meat === 'bebek' || strpos($name, 'bebek') !== false || strpos($name, 'itik') !== false) {
-            $stick_counts['Bebek (Duck)'] += $qty;
-            $total_calculated_sticks += $qty;
-        } elseif ($meat === 'rusa' || strpos($name, 'rusa') !== false) {
-            $stick_counts['Rusa (Venison)'] += $qty;
+            $stick_counts['Sate Daging'] += $qty;
             $total_calculated_sticks += $qty;
         } elseif (strpos($meat, 'combo_15') !== false || strpos($name, 'platter mini') !== false) {
             $total_calculated_sticks += (15 * $qty);
@@ -194,6 +178,16 @@ function handle_get_dashboard_stats(PDO $pdo) {
             $total_calculated_sticks += (30 * $qty);
         } elseif (strpos($meat, 'combo_50') !== false || strpos($name, 'platter diraja') !== false) {
             $total_calculated_sticks += (50 * $qty);
+        } else {
+            // Any other skewer meat type present in order items
+            if ($qty > 0 && !empty($ri['item_name'])) {
+                $displayName = $ri['item_name'];
+                if (!isset($stick_counts[$displayName])) {
+                    $stick_counts[$displayName] = 0;
+                }
+                $stick_counts[$displayName] += $qty;
+                $total_calculated_sticks += $qty;
+            }
         }
     }
 
