@@ -211,8 +211,8 @@ $isDrinksStaff = ($currentUser['role'] === 'staff_drinks' || strpos(strtolower($
                                 </select>
                             </div>
                             <div>
-                                <label class="form-label" for="pos-table-number">Table Selection:</label>
-                                <select class="form-select" id="pos-table-number" style="padding:0.4rem 0.6rem;">
+                                <label class="form-label" for="pos-table-number" id="pos-table-label">Table Selection:</label>
+                                <select class="form-select" id="pos-table-number" style="padding:0.4rem 0.6rem;" disabled>
                                     <option value="">-- No Table (Takeaway) --</option>
                                 </select>
                             </div>
@@ -220,8 +220,8 @@ $isDrinksStaff = ($currentUser['role'] === 'staff_drinks' || strpos(strtolower($
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="pos-customer-name">Customer Name:</label>
-                        <input type="text" class="form-input" id="pos-customer-name" placeholder="Walk-in Guest" style="padding:0.4rem 0.6rem;">
+                        <label class="form-label" for="pos-customer-name" id="pos-name-label">Customer Name:</label>
+                        <input type="text" class="form-input" id="pos-customer-name" value="Takeaway Customer" placeholder="Takeaway Customer" style="padding:0.4rem 0.6rem;" disabled>
                     </div>
 
                     <!-- Cart Item List -->

@@ -102,6 +102,58 @@ const ClientApp = {
         this.soundEnabled = e.target.checked;
       });
     }
+
+    // POS Dining Mode switcher (Takeaway vs Dine-In)
+    const posDiningSelect = document.getElementById('pos-dining-type');
+    if (posDiningSelect) {
+      posDiningSelect.addEventListener('change', () => this.handlePOSDiningModeChange());
+      // Initial state sync
+      this.handlePOSDiningModeChange();
+    }
+  },
+
+  handlePOSDiningModeChange() {
+    const diningMode = document.getElementById('pos-dining-type')?.value || 'takeaway';
+    const tableSelect = document.getElementById('pos-table-number');
+    const customerInput = document.getElementById('pos-customer-name');
+
+    const isTakeaway = (diningMode === 'takeaway');
+
+    if (tableSelect) {
+      tableSelect.disabled = isTakeaway;
+      if (isTakeaway) {
+        tableSelect.value = '';
+        tableSelect.style.opacity = '0.55';
+        tableSelect.style.cursor = 'not-allowed';
+        tableSelect.style.backgroundColor = 'var(--bg-main)';
+      } else {
+        tableSelect.style.opacity = '1';
+        tableSelect.style.cursor = 'default';
+        tableSelect.style.backgroundColor = '';
+        // If not selected, pick first available table
+        if (!tableSelect.value && tableSelect.options.length > 1) {
+          tableSelect.selectedIndex = 1;
+        }
+      }
+    }
+
+    if (customerInput) {
+      customerInput.disabled = isTakeaway;
+      if (isTakeaway) {
+        customerInput.value = 'Takeaway Customer';
+        customerInput.style.opacity = '0.55';
+        customerInput.style.cursor = 'not-allowed';
+        customerInput.style.backgroundColor = 'var(--bg-main)';
+      } else {
+        if (customerInput.value === 'Takeaway Customer') {
+          customerInput.value = '';
+        }
+        customerInput.placeholder = 'e.g. Encik Farhan / Guest';
+        customerInput.style.opacity = '1';
+        customerInput.style.cursor = 'text';
+        customerInput.style.backgroundColor = '';
+      }
+    }
   },
 
   updateStationPillsUI() {
@@ -198,6 +250,7 @@ const ClientApp = {
 
     if (tab === 'pos') {
       this.populatePOSTables();
+      this.handlePOSDiningModeChange();
     } else if (tab === 'stock') {
       this.renderStockManager();
     }
@@ -679,9 +732,10 @@ const ClientApp = {
       return;
     }
 
-    const dining = document.getElementById('pos-dining-type')?.value || 'dine_in';
-    const table = document.getElementById('pos-table-number')?.value.trim() || 'Counter';
-    const customer = document.getElementById('pos-customer-name')?.value.trim() || 'Walk-in Guest';
+    const dining = document.getElementById('pos-dining-type')?.value || 'takeaway';
+    const isTakeaway = (dining === 'takeaway');
+    const table = isTakeaway ? '' : (document.getElementById('pos-table-number')?.value.trim() || 'Counter');
+    const customer = isTakeaway ? 'Takeaway Customer' : (document.getElementById('pos-customer-name')?.value.trim() || 'Walk-in Guest');
     const payment = document.getElementById('pos-payment-method')?.value || 'cash';
 
     const payload = {
